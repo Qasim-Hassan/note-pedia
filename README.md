@@ -1,2 +1,2 @@
-# note-pedia
-Frontend-only note-app. 
+This is a basic frontend-based note-taking app that uses LocalStorage of user's browser to store their notes. Built with React + TypeScript, it provides users with the capability to create, read, update, and delete their notes and the tags they associate with their notes. You can try this online at:
+https://note-pedia.netlify.app
