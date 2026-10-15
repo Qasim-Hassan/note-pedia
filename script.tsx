@@ -14,8 +14,10 @@ const root = createRoot(document.getElementById("root")!);
 
 //all our custom data types...
 type Note = {
-    id: string
-} & NoteData;
+    id: string,
+    createdAt: string,
+    updatedAt?: string
+} & NoteData
 
 type NoteData = {
     title: string,
@@ -41,7 +43,9 @@ type RawNote = {
 type RawNoteData = {
     title: string,
     body: string,
-    tagIds: string[]
+    tagIds: string[],
+    createdAt?: string,
+    updatedAt?: string
 }
 
 type Tag = {
@@ -58,7 +62,9 @@ type NoteFormProps = {
 type SimplifiedNotes ={
     tags: Tag[],
     title: string,
-    id: string
+    id: string,
+    createdAt: string,
+    updatedAt?: string
 }
 
 type DeleteNoteProps ={
@@ -305,6 +311,7 @@ function EditNote({submitFn, onAddTag, availableTags}: any){
 function ShowNotes({onDelete}: DeleteNoteProps){
     const note = useNote()
     const navigate = useNavigate()
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
     return(
         <>
             <Row className="align-items-center mb-4">
@@ -321,24 +328,40 @@ function ShowNotes({onDelete}: DeleteNoteProps){
                         <Link to={`/${note.id}/edit`}>
                             <Button variant="primary">Edit</Button>
                         </Link>
-                        <Link to="/">
-                            <Button onClick={()=> {
-                                onDelete(note.id);
-                                navigate("/")
-                            }} variant="outline-danger">Delete</Button>
-                        </Link>
+                        <Button variant="outline-danger" onClick={() => setShowDeleteConfirmation(true)}>Delete</Button>
                         <Link to="..">
                             <Button variant="outline-secondary">Back</Button>
                         </Link>
                     </Stack>
                 </Col>
             </Row>
+            <p className="text-muted small">
+                Created {formatNoteDate(note.createdAt)}
+                {note.updatedAt && <> | Edited {formatNoteDate(note.updatedAt)}</>}
+            </p>
             <ReactMarkdown>{note.body}</ReactMarkdown>
+            <Modal show={showDeleteConfirmation} onHide={() => setShowDeleteConfirmation(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Delete note?</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>Are you sure you want to delete "{note.title}"?</Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteConfirmation(false)}>Cancel</Button>
+                    <Button variant="danger" onClick={() => {
+                        onDelete(note.id)
+                        navigate("/")
+                    }}>Delete</Button>
+                </Modal.Footer>
+            </Modal>
         </>
     )
 }
 
-function NoteCard({id, title, tags}: SimplifiedNotes){
+function formatNoteDate(date: string){
+    return new Date(date).toLocaleString()
+}
+
+function NoteCard({id, title, tags, createdAt, updatedAt}: SimplifiedNotes){
     return(
         <Card as={Link} to={`/${id}`} className= {`h-100 text-reset text-decoration-none ${styles.card}`}>
             <Card.Body>
@@ -349,6 +372,10 @@ function NoteCard({id, title, tags}: SimplifiedNotes){
                             {tags.map(tag => ( <Badge className="text-truncates" key={tag.id}>{tag.label}</Badge>))}
                         </Stack>
                     )}
+                    <small className="text-muted">
+                        Created {formatNoteDate(createdAt)}
+                        {updatedAt && <> | Edited {formatNoteDate(updatedAt)}</>}
+                    </small>
                 </Stack>
             </Card.Body>
         </Card>
@@ -411,7 +438,13 @@ function NoteList({availableTags, notes, updateTag, deleteTag}: NoteListp){
                 {filterednotes.map((note)=>{
                     return(
                         <Col key={note.id}>
-                            <NoteCard id={note.id} title={note.title} tags={note.tags}/>
+                            <NoteCard
+                                id={note.id}
+                                title={note.title}
+                                tags={note.tags}
+                                createdAt={note.createdAt}
+                                updatedAt={note.updatedAt}
+                            />
                         </Col>
                     )
                 })}
@@ -424,17 +457,36 @@ function NoteList({availableTags, notes, updateTag, deleteTag}: NoteListp){
 function App(){
     const [notes, setNotes] = useLocalStorage<RawNote[]>("NOTES", []);
     const [tags, setTags] = useLocalStorage<Tag[]>("TAGS", []);
+    const [legacyCreatedAt] = useState(() => new Date().toISOString())
+
+    useEffect(() => {
+        if (notes.some(note => !note.createdAt)) {
+            setNotes(previousNotes => previousNotes.map(note => ({
+                ...note,
+                createdAt: note.createdAt ?? legacyCreatedAt
+            })))
+        }
+    }, [notes, setNotes, legacyCreatedAt])
 
     //convert RawNotes to Notes
     const notesWithTags = useMemo(()=>{
         return notes.map(note => {
-            return {...note, tags: tags.filter(tag => note.tagIds.includes(tag.id))}
+            return {
+                ...note,
+                createdAt: note.createdAt ?? legacyCreatedAt,
+                tags: tags.filter(tag => note.tagIds.includes(tag.id))
+            }
         })
-    }, [notes , tags])
+    }, [notes, tags, legacyCreatedAt])
 
     function onCreateNote({tags, ...data}: NoteData){
         setNotes(prevNotes => {
-            return [...prevNotes, {...data, id: uuidv4(), tagIds: tags.map(t=>t.id)}]
+            return [...prevNotes, {
+                ...data,
+                id: uuidv4(),
+                tagIds: tags.map(t=>t.id),
+                createdAt: new Date().toISOString()
+            }]
         })
     }
 
@@ -442,7 +494,7 @@ function App(){
         setNotes(prev=>{
             return prev.map(note => {
                 if (note.id === id){
-                    return {...note,...data, tagIds: tags.map(t=>t.id)}
+                    return {...note,...data, tagIds: tags.map(t=>t.id), updatedAt: new Date().toISOString()}
                 }else{
                     return note
                 }
@@ -480,6 +532,11 @@ function App(){
 
     return(
         <Container className="my-4">
+            <div className="mb-4 rounded border bg-light p-2 text-center small">
+                <a href="https://github.com/Qasim-Hassan/note-pedia" target="_blank" rel="noreferrer">
+                    Contribute with code or ideas
+                </a>
+            </div>
             <Routes>
                 <Route path="/" element={<NoteList availableTags={tags} notes={notesWithTags} updateTag={updateTag} deleteTag={deleteTag}/>} />
                 <Route path="/new" element={<NewNote submitFn={onCreateNote} onAddTag={addTags} availableTags={tags}/>} />

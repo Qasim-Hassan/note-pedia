@@ -10,9 +10,11 @@ Try the app [here](https://note-pedia.netlify.app)
 ## 🚀 Key Featues
 
 - Persistent storage of notes (using browser's Localstorage)
+- Creation and last-edited dates for notes, including existing saved notes
 - Ability to write notes in Markdown language
 - Ability to create, add, edit and delete tags for each note
 - Searching notes by title/relevant tag
+- Confirmation before deleting a note
 - Fast, simple, and free to use
 
 ----
